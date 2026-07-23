@@ -59,7 +59,7 @@ jobs:
           OPENAI_API_KEY: test-key
         run: |
           ruff check app tests
-          run: python -m pytest tests -q
+          python -m pytest tests -q
 
   build:
     name: Build and push image
