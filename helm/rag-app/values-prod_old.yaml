@@ -1,0 +1,32 @@
+replicaCount: 1
+
+
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+worker:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+config:
+  gcpProjectId: mcp-rag-prod
+  pubsubProjectId: mcp-rag-prod
+  pubsubSubscription: document-ingestion-sub-prod
+  collectionName: DocumentChunk
+  weaviateUrl: http://weaviate.rag-prod.svc.cluster.local:80      
+env:
+  CLUSTER_HOSTNAME: "weaviate-node-1"
+  RAFT_JOIN: "weaviate-node-1"
+  RAFT_BOOTSTRAP_EXPECT: "1"
+  CLUSTER_JOIN: "weaviate-headless.rag.svc.cluster.local."      
