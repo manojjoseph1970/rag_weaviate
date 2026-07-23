@@ -17,10 +17,6 @@ resources:
 secrets:
   openaiApiKey: None
   weaviateApiKey: "xxxxx"
-<<<<<<< HEAD
-=======
-  
->>>>>>> 5028648 (Initial commit)
 env:
   CLUSTER_HOSTNAME: "weaviate-node-1"
   RAFT_JOIN: "weaviate-node-1"

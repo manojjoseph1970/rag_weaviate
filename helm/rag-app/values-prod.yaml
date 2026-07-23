@@ -14,3 +14,8 @@ resources:
   limits:
     cpu: "2"
     memory: 2Gi
+env:
+  CLUSTER_HOSTNAME: "weaviate-node-1"
+  RAFT_JOIN: "weaviate-node-1"
+  RAFT_BOOTSTRAP_EXPECT: "1"
+  CLUSTER_JOIN: "weaviate-headless.rag.svc.cluster.local."      
