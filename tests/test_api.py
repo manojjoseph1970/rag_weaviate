@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import app
-from app.models import AskResponse,  SearchHit
+from app.models import AskResponse, SearchHit
 
 
 @pytest.fixture

@@ -1,8 +1,8 @@
 import hashlib
+
 import pytest
 
 from app.ingestion import TextChunk, normalize_text, split_text
-
 
 # -------------------------------------------------------------------
 # normalize_text tests
@@ -198,7 +198,7 @@ def test_split_text_generates_expected_chunk_id() -> None:
     )
 
     expected_id = hashlib.sha256(
-        f"{doc_id}:0:{content}".encode("utf-8")
+        f"{doc_id}:0:{content}".encode()
     ).hexdigest()
 
     assert result[0].chunk_id == expected_id

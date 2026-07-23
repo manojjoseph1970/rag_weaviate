@@ -410,13 +410,15 @@ class TestMain:
 
         mock_subscriber_class.return_value = subscriber
 
-        with patch(
-            "app.pubsub_worker.stop_event.wait",
-            return_value=False,
-        ):
-            with pytest.raises(
-                RuntimeError,
-                match="Streaming failure",
+        with (
+                patch(
+                    "app.pubsub_worker.stop_event.wait",
+                    return_value=False,
+                ),
+                pytest.raises(
+                    RuntimeError,
+                    match="Streaming failure",
+                ),
             ):
                 main()
 

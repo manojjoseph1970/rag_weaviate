@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
@@ -74,9 +75,9 @@ def ingest_document(document: DocumentInput) -> IngestResult:
 
 @app.post("/documents/upload", response_model=IngestResult)
 async def upload_document(
-    file: UploadFile = File(...),
-    department: str = Form(default="General"),
-    security_level: str = Form(default="internal"),
+    file: Annotated[UploadFile , File(...)],
+    department: Annotated[str, Form()] = "General",
+    security_level: Annotated[str, Form()] = "internal",
 ) -> IngestResult:
     filename = file.filename or "uploaded.txt"
     suffix = Path(filename).suffix.lower()
