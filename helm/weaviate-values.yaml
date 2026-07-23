@@ -5,6 +5,12 @@
 
 replicas: 1
 
+initContainers:
+  sysctlInitContainer:
+    enabled: false
+
+default_vectorizer_module: none
+
 image:
   tag: "1.32.4"
 
@@ -19,6 +25,7 @@ grpcService:
   type: ClusterIP
 
 storage:
+  name: weaviate-data
   size: 100Gi
   storageClassName: standard-rwo
 
