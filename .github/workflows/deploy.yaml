@@ -257,8 +257,6 @@ jobs:
           helm upgrade --install weaviate weaviate/weaviate \
             --namespace "${NAMESPACE}" \
             --values ./helm/weaviate-values.yaml \
-            --server-side=true \
-            --force-conflicts \
             --wait \
             --timeout 15m \
             --history-max 10
