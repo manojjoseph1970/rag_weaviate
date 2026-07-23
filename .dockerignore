@@ -70,3 +70,6 @@ Thumbs.db
 
 # Local model cache
 models/
+
+helm/rag-app/templates/secretsold.yaml.old
+t1est.py

@@ -79,3 +79,5 @@ coverage.xml
 # Generated files
 *.zip
 *.tar.gz
+helm/rag-app/templates/secretsold.yaml.old
+t1est.py

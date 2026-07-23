@@ -47,6 +47,10 @@ resources:
   limits:
     cpu: "2"
     memory: 3Gi
+    
+openai:
+  secretName: rag-app-secrets
+  secretKey: OPENAI_API_KEY    
 
 worker:
   enabled: true

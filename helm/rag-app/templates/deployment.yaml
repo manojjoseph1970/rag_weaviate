@@ -1,5 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
+env:
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: rag-app-secrets
+        key: OPENAI_API_KEY
 metadata:
   name: {{ include "rag-app.fullname" . }}
   labels:
