@@ -11,7 +11,6 @@ from app.config import get_settings
 from app.models import DocumentInput
 from app.weaviate_store import initialize_collection, upsert_document
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",

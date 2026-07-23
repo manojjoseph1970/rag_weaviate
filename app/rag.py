@@ -4,7 +4,6 @@ from app.config import get_settings
 from app.models import AskResponse
 from app.weaviate_store import semantic_search
 
-
 SYSTEM_PROMPT = """You are a grounded enterprise knowledge assistant.
 Answer only from the supplied context.
 If the context does not contain the answer, say that you do not know.

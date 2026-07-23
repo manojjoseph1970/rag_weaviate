@@ -48,7 +48,7 @@ def split_text(
 
         content = " ".join(current)
         digest = hashlib.sha256(
-            f"{doc_id}:{index}:{content}".encode("utf-8")
+            f"{doc_id}:{index}:{content}".encode()
         ).hexdigest()
         chunks.append(
             TextChunk(

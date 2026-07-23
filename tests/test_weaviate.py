@@ -1,5 +1,5 @@
 
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import UUID
@@ -154,9 +154,11 @@ class TestGetClient:
         client = MagicMock()
         mock_connect.return_value = client
 
-        with pytest.raises(RuntimeError, match="Test failure"):
-            with get_client():
-                raise RuntimeError("Test failure")
+        with (
+            pytest.raises(RuntimeError, match="Test failure"),
+            get_client(),
+        ):
+            raise RuntimeError("Test failure")
 
         client.close.assert_called_once_with()
 
@@ -290,13 +292,14 @@ class TestUpsertDocument:
         mock_embed_texts.return_value = vectors
 
         fixed_time = datetime(
-            2026,
-            7,
-            22,
-            12,
-            0,
-            0,
-        )
+                        2026,
+                        7,
+                        22,
+                        12,
+                        0,
+                        0,
+                        tzinfo=UTC,
+                    )
         mock_datetime.now.return_value = fixed_time
 
         client = MagicMock()
