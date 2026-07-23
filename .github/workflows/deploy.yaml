@@ -26,7 +26,7 @@ env:
   NAMESPACE: rag
   HELM_CHART: ./helm/rag-app
   VALUES_FILE: ./helm/rag-app/values-prod.yaml
-
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 
 jobs:
@@ -140,9 +140,9 @@ jobs:
           kubectl create namespace "${NAMESPACE}" \
             --dry-run=client \
             -o yaml | kubectl apply -f -    
+
       - name: Create OpenAI Kubernetes Secret
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
         run: |
             test -n "$OPENAI_API_KEY" || {
               echo "OPENAI_API_KEY is not configured"
