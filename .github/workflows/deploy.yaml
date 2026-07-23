@@ -135,6 +135,30 @@ jobs:
           cluster_name: ${{ env.CLUSTER_NAME }}
           location: ${{ env.GKE_LOCATION }}
           project_id: ${{ env.PROJECT_ID }}
+      - name: Ensure namespace exists
+        run: |
+          kubectl create namespace "${NAMESPACE}" \
+            --dry-run=client \
+            -o yaml | kubectl apply -f -    
+      - name: Create OpenAI Kubernetes Secret
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          run: |
+            test -n "$OPENAI_API_KEY" || {
+              echo "OPENAI_API_KEY is not configured"
+              exit 1
+            }
+
+            kubectl create secret generic rag-app-secrets \
+              --namespace "${NAMESPACE}" \
+              --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+              --dry-run=client \
+              -o yaml | kubectl apply -f -
+
+      - name: Verify secret
+        run: |
+          kubectl get secret rag-app-secrets \
+            --namespace "${NAMESPACE}"      
 
       - name: Validate Helm chart
         run: |
