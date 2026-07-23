@@ -26,7 +26,7 @@ grpcService:
 
 storage:
   name: weaviate-data
-  size: 100Gi
+  size: 20Gi
   storageClassName: standard-rwo
 
 resources:
