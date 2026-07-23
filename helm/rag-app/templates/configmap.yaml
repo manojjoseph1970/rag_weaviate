@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rag-app.fullname" . }}
+  labels:
+    {{- include "rag-app.labels" . | nindent 4 }}
+data:
+  WEAVIATE_HTTP_HOST: {{ .Values.config.weaviateHttpHost | quote }}
+  WEAVIATE_HTTP_PORT: {{ .Values.config.weaviateHttpPort | quote }}
+  WEAVIATE_GRPC_HOST: {{ .Values.config.weaviateGrpcHost | quote }}
+  WEAVIATE_GRPC_PORT: {{ .Values.config.weaviateGrpcPort | quote }}
+  WEAVIATE_SECURE: {{ .Values.config.weaviateSecure | quote }}
+  COLLECTION_NAME: {{ .Values.config.weaviateCollection | quote }}
+  EMBEDDING_MODEL: {{ .Values.config.embeddingModel | quote }}
+  EMBEDDING_DEVICE: {{ .Values.config.embeddingDevice | quote }}
+  CHUNK_SIZE: {{ .Values.config.chunkSize | quote }}
+  CHUNK_OVERLAP: {{ .Values.config.chunkOverlap | quote }}
+  OPENAI_MODEL: {{ .Values.config.openaiModel | quote }}
+  GCP_PROJECT_ID: {{ .Values.config.gcpProjectId | quote }}
+  PUBSUB_SUBSCRIPTION: {{ .Values.config.pubsubSubscription | quote }}

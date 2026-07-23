@@ -1,0 +1,70 @@
+name: RAG Application CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run Ruff
+        run: |
+          ruff check app tests
+
+      - name: Run unit tests
+        env:
+          GCP_PROJECT_ID: test-project
+          PUBSUB_PROJECT_ID: test-project
+          PUBSUB_SUBSCRIPTION: test-subscription
+          COLLECTION_NAME: DocumentChunk
+          WEAVIATE_URL: http://localhost:8080
+          OPENAI_API_KEY: test-key
+        run: |
+          pytest tests --cov=app --cov-report=term-missing
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag rag-app:${{ github.sha }} \
+            .
+
+      - name: Validate Helm chart
+        run: |
+          helm lint ./helm/rag-app \
+            --values ./helm/rag-app/values-dev.yaml \
+            --set-string image.repository=test-repository/rag-app \
+            --set-string image.tag=${{ github.sha }}
+
+          helm template rag-app ./helm/rag-app \
+            --namespace rag \
+            --values ./helm/rag-app/values-dev.yaml \
+            --set-string image.repository=test-repository/rag-app \
+            --set-string image.tag=${{ github.sha }} \
+            > rendered-manifests.yaml

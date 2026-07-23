@@ -1,0 +1,70 @@
+# Values for the official Weaviate Helm chart.
+# Install with:
+# helm upgrade --install weaviate weaviate/weaviate \
+#   --namespace rag --values helm/weaviate-values.yaml
+
+replicas: 1
+
+image:
+  tag: "1.32.4"
+
+service:
+  name: weaviate
+  type: ClusterIP
+  loadBalancerSourceRanges: []
+
+grpcService:
+  enabled: true
+  name: weaviate-grpc
+  type: ClusterIP
+
+storage:
+  size: 100Gi
+  storageClassName: standard-rwo
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 4Gi
+  limits:
+    cpu: "2"
+    memory: 8Gi
+
+requests:
+  cpu: "1"
+  memory: 4Gi
+
+limits:
+  cpu: "2"
+  memory: 8Gi
+
+env:
+  QUERY_DEFAULTS_LIMIT: "25"
+  PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+  DEFAULT_VECTORIZER_MODULE: "none"
+  ENABLE_MODULES: ""
+  AUTOSCHEMA_ENABLED: "false"
+  CLUSTER_HOSTNAME: "node1"
+  PROMETHEUS_MONITORING_ENABLED: "true"
+  TRACK_VECTOR_DIMENSIONS: "true"
+
+authentication:
+  anonymous_access:
+    enabled: false
+  apikey:
+    enabled: true
+    existingSecret: weaviate-auth
+  oidc:
+    enabled: false
+
+authorization:
+  rbac:
+    enabled: false
+  admin_list:
+    enabled: true
+    users:
+      - rag-app
+
+# Keep Weaviate private. Expose the RAG API, not the database.
+# For a production three-node deployment, set replicas: 3 and update the
+# application's collection replication factor after reviewing capacity.

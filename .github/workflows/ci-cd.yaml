@@ -1,0 +1,130 @@
+name: Build and deploy self-hosted Weaviate RAG
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: ${{ vars.GCP_REGION }}
+  CLUSTER_NAME: ${{ vars.GKE_CLUSTER }}
+  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
+  NAMESPACE: ${{ vars.GKE_NAMESPACE }}
+  IMAGE_NAME: rag-app
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+      - run: python -m compileall app
+
+      - uses: azure/setup-helm@v4
+      - run: helm lint helm/rag-app --set image.tag=test
+      - run: |
+          helm template rag-app helm/rag-app \
+            --namespace rag \
+            --set image.tag=test \
+            --set image.repository=example/rag-app \
+            > /tmp/rag-app-rendered.yaml
+
+  build-and-deploy:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: gke-rag-production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push immutable image
+        id: image
+        shell: bash
+        run: |
+          REPOSITORY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}"
+          URI="${REPOSITORY}:${GITHUB_SHA}"
+          docker build \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "${URI}" .
+          docker push "${URI}"
+          echo "repository=${REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - uses: azure/setup-helm@v4
+
+      - name: Install or upgrade Weaviate
+        run: |
+          helm repo add weaviate https://weaviate.github.io/weaviate-helm
+          helm repo update
+          helm upgrade --install weaviate weaviate/weaviate \
+            --namespace "${NAMESPACE}" \
+            --create-namespace \
+            --values helm/weaviate-values.yaml \
+            --atomic \
+            --wait \
+            --timeout 15m \
+            --history-max 10
+
+      - name: Install or upgrade RAG service
+        run: |
+          helm upgrade --install rag-app helm/rag-app \
+            --namespace "${NAMESPACE}" \
+            --values helm/rag-app/values.yaml \
+            --set-string image.repository="${{ steps.image.outputs.repository }}" \
+            --set-string image.tag="${{ steps.image.outputs.tag }}" \
+            --set-string config.gcpProjectId="${PROJECT_ID}" \
+            --set-string serviceAccount.annotations."iam\.gke\.io/gcp-service-account"="rag-app@${PROJECT_ID}.iam.gserviceaccount.com" \
+            --atomic \
+            --wait \
+            --timeout 15m \
+            --history-max 10
+
+      - name: Verify
+        run: |
+          kubectl -n "${NAMESPACE}" rollout status deployment/rag-app --timeout=5m
+          kubectl -n "${NAMESPACE}" rollout status deployment/rag-app-worker --timeout=5m
+          kubectl -n "${NAMESPACE}" get pods,pvc,services
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n "${NAMESPACE}" get all,pvc || true
+          kubectl -n "${NAMESPACE}" get events --sort-by=.lastTimestamp || true
+          kubectl -n "${NAMESPACE}" describe pods || true

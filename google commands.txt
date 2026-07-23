@@ -1,0 +1,62 @@
+
+gcloud services enable  artifactregistry.googleapis.com   container.googleapis.com   iamcredentials.googleapis.com sts.googleapis.com  --project="${PROJECT_ID}"
+
+
+gcloud artifacts repositories create "${REPOSITORY}"  --repository-format=docker  --location="${REGION}"  --description="RAG application Docker images"  --project="${PROJECT_ID}"
+
+
+
+helm template rag-api ./helm/rag-api --namespace rag   --set image.tag=test
+
+=_--dry run 
+
+helm upgrade --install rag-app ./helm/rag-app --namespace rag --create-namespace --set image.tag=test --dry-run
+
+gcloud iam service-accounts create "${DEPLOY_SA}" --display-name="GitHub GKE deployment service account"  --project="${PROJECT_ID}"
+
+
+gcloud projects add-iam-policy-binding "${PROJECT_ID}"    --member="serviceAccount:${DEPLOY_SA}@${PROJECT_ID}.iam.gserviceaccount.com"    --role="roles/artifactregistry.writer"
+
+
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${DEPLOY_SA}@${PROJECT_ID}.iam.gserviceaccount.com"  --role="roles/container.developer"
+
+--- get deployment
+
+kubectl get deployment rag-app-rag-app --namespace rag  -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+---Installing the version
+
+helm upgrade --install rag-app ./helm/rag-app  --namespace rag --values ./helm/rag-app/values-dev.yaml  --set-string image.repository=us-central1-docker.pkg.dev/mcp-rag-dev-502016/rag-images/rag-app  --set-string image.tag=v1.0.0 --atomic  --wait
+
+helm upgrade --install rag-app ./helm/rag-app `
+  --namespace rag `
+  --values ./helm/rag-app/values-dev.yaml `
+  --set-string image.repository=us-central1-docker.pkg.dev/mcp-rag-dev-502016/rag-images/rag-app `
+  --set-string image.tag=v1.0.3 `
+  --rollback-on-failure `
+  --wait `
+  --timeout 15m
+
+
+
+rollbacking teh release 
+
+helm rollback rag-api 1 --namespace rag --wait
+
+
+
+gcloud artifacts docker images list `
+  us-central1-docker.pkg.dev/mcp-rag-dev-502016/rag-images/rag-api `
+  --include-tags `
+  --project=mcp-rag-dev-502016
+
+
+
+docker tag `
+  rag-app:local `
+  us-central1-docker.pkg.dev/mcp-rag-dev-502016/rag-images/rag-app:v1.0.0
+ 
+
+
+docker push `
+  us-central1-docker.pkg.dev/mcp-rag-dev-502016/rag-images/rag-app:v1.0.3

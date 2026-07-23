@@ -1,0 +1,28 @@
+replicaCount: 1
+
+config:
+  gcpProjectId: mcp-rag-dev-502016
+  pubsubProjectId: mcp-rag-dev-502016
+  pubsubSubscription: document-ingestion-sub
+  COLLECTION_NAME: DocumentChunk
+  weaviateUrl: http://weaviate.rag-dev.svc.cluster.local:80
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+secrets:
+  openaiApiKey: None
+  weaviateApiKey: "xxxxx"
+<<<<<<< HEAD
+=======
+  
+>>>>>>> 5028648 (Initial commit)
+env:
+  CLUSTER_HOSTNAME: "weaviate-node-1"
+  RAFT_JOIN: "weaviate-node-1"
+  RAFT_BOOTSTRAP_EXPECT: "1"
+  CLUSTER_JOIN: "weaviate-headless.rag.svc.cluster.local."  

@@ -1,0 +1,86 @@
+replicaCount: 2
+
+image:
+  repository: us-central1-docker.pkg.dev/replace-project/rag-images/rag-app
+  tag: "v1.0.3"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "rag-app"
+
+serviceAccount:
+  create: true
+  name: rag-app
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+config:
+  weaviateHttpHost: weaviate
+  weaviateHttpPort: 80
+  weaviateGrpcHost: weaviate-grpc
+  weaviateGrpcPort: 50051
+  weaviateSecure: "false"
+  weaviateCollection: DocumentChunk
+  embeddingModel: sentence-transformers/all-MiniLM-L6-v2
+  embeddingDevice: cpu
+  chunkSize: "800"
+  chunkOverlap: "120"
+  openaiModel: gpt-4.1-mini
+  gcpProjectId: replace-project
+  pubsubSubscription: document-ingestion-sub
+
+existingSecret: rag-app-secrets
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 3Gi
+
+worker:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+
+probes:
+  readiness:
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 12
+  liveness:
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 6
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

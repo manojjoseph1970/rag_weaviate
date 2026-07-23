@@ -1,0 +1,16 @@
+replicaCount: 3
+
+config:
+  gcpProjectId: mcp-rag-prod
+  pubsubProjectId: mcp-rag-prod
+  pubsubSubscription: document-ingestion-sub-prod
+  collectionName: DocumentChunk
+  weaviateUrl: http://weaviate.rag-prod.svc.cluster.local:80
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi
