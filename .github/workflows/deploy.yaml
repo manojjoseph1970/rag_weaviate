@@ -1,14 +1,13 @@
-name: Deploy RAG Application to GKE
+name: Build and Deploy Self-Hosted Weaviate RAG to GKE
 
 on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 concurrency:
-  group: rag-app-production
+  group: rag-app-development
   cancel-in-progress: false
 
 permissions:
@@ -18,22 +17,26 @@ permissions:
 env:
   PROJECT_ID: mcp-rag-dev-502016
   REGION: us-central1
-  CLUSTER_NAME: rag-cluster
   GKE_LOCATION: us-central1
+  CLUSTER_NAME: rag-cluster
   ARTIFACT_REPOSITORY: rag-images
   IMAGE_NAME: rag-app
   RELEASE_NAME: rag-app
+  WEAVIATE_RELEASE_NAME: weaviate
   NAMESPACE: rag
   HELM_CHART: ./helm/rag-app
   VALUES_FILE: ./helm/rag-app/values-prod.yaml
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  WEAVIATE_VALUES_FILE: ./helm/weaviate-values.yaml
+  KUBERNETES_SECRET_NAME: rag-app-secrets
 
 jobs:
   test:
-    name: Run tests
+    name: Test and validate
     runs-on: ubuntu-latest
+
     env:
       PYTHONPATH: ${{ github.workspace }}
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -46,11 +49,12 @@ jobs:
 
       - name: Install dependencies
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov ruff
 
-      - name: Run checks
+      - name: Run lint, tests, and compile checks
         env:
           GCP_PROJECT_ID: test-project
           PUBSUB_PROJECT_ID: test-project
@@ -59,8 +63,39 @@ jobs:
           WEAVIATE_URL: http://localhost:8080
           OPENAI_API_KEY: test-key
         run: |
+          set -euo pipefail
           ruff check app tests
           python -m pytest tests -q
+          python -m compileall app
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate RAG Helm chart
+        run: |
+          set -euo pipefail
+
+          helm lint "${HELM_CHART}" \
+            --values "${VALUES_FILE}" \
+            --set-string image.repository=example/rag-app \
+            --set-string image.tag=test
+
+          helm template "${RELEASE_NAME}" "${HELM_CHART}" \
+            --namespace "${NAMESPACE}" \
+            --values "${VALUES_FILE}" \
+            --set-string image.repository=example/rag-app \
+            --set-string image.tag=test \
+            > /tmp/rag-app-rendered.yaml
+
+          if grep -q '^kind: Secret$' /tmp/rag-app-rendered.yaml; then
+            echo "ERROR: The RAG Helm chart must not render a Kubernetes Secret."
+            echo "The external secret is created by GitHub Actions."
+            grep -n -A15 -B5 '^kind: Secret$' /tmp/rag-app-rendered.yaml
+            exit 1
+          fi
+
+          grep -n -A4 -B4 "${KUBERNETES_SECRET_NAME}" \
+            /tmp/rag-app-rendered.yaml
 
   build:
     name: Build and push image
@@ -80,12 +115,16 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_CICD_SERVICE_ACCOUNT }}
+          project_id: ${{ env.PROJECT_ID }}
 
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
 
       - name: Configure Docker authentication
         run: |
+          set -euo pipefail
           gcloud auth configure-docker \
             "${REGION}-docker.pkg.dev" \
             --quiet
@@ -94,29 +133,39 @@ jobs:
         id: image
         shell: bash
         run: |
+          set -euo pipefail
+
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${IMAGE_NAME}"
           TAG="${GITHUB_SHA}"
 
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
 
       - name: Build Docker image
         run: |
+          set -euo pipefail
+
           docker build \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --tag "${{ steps.image.outputs.image }}:${{ steps.image.outputs.tag }}" \
             --tag "${{ steps.image.outputs.image }}:latest" \
             .
 
       - name: Push Docker image
         run: |
-          docker push "${{ steps.image.outputs.image }}:${{ steps.image.outputs.tag }}"
-          docker push "${{ steps.image.outputs.image }}:latest"
+          set -euo pipefail
+
+          docker push \
+            "${{ steps.image.outputs.image }}:${{ steps.image.outputs.tag }}"
+
+          docker push \
+            "${{ steps.image.outputs.image }}:latest"
 
   deploy:
-    name: Deploy to GKE
+    name: Deploy Weaviate and RAG to GKE
     needs: build
     runs-on: ubuntu-latest
-    environment: development
+    #environment: development
 
     steps:
       - name: Check out repository
@@ -127,6 +176,12 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_CICD_SERVICE_ACCOUNT }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
 
       - name: Get GKE credentials
         uses: google-github-actions/get-gke-credentials@v3
@@ -134,59 +189,170 @@ jobs:
           cluster_name: ${{ env.CLUSTER_NAME }}
           location: ${{ env.GKE_LOCATION }}
           project_id: ${{ env.PROJECT_ID }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
       - name: Ensure namespace exists
         run: |
+          set -euo pipefail
+
           kubectl create namespace "${NAMESPACE}" \
             --dry-run=client \
-            -o yaml | kubectl apply -f -    
+            --output=yaml | kubectl apply -f -
+
+      - name: Install or upgrade Weaviate
+        run: |
+          set -euo pipefail
+
+          test -f "${WEAVIATE_VALUES_FILE}" || {
+            echo "Missing ${WEAVIATE_VALUES_FILE}"
+            exit 1
+          }
+
+          helm repo add weaviate \
+            https://weaviate.github.io/weaviate-helm \
+            --force-update
+
+          helm repo update
+
+          helm upgrade --install "${WEAVIATE_RELEASE_NAME}" weaviate/weaviate \
+            --namespace "${NAMESPACE}" \
+            --values "${WEAVIATE_VALUES_FILE}" \
+            --wait \
+            --timeout 15m \
+            --history-max 10
+
+      - name: Verify Weaviate deployment
+        run: |
+          set -euo pipefail
+
+          kubectl rollout status statefulset/weaviate \
+            --namespace "${NAMESPACE}" \
+            --timeout=10m
+
+          kubectl get pods,services,pvc \
+            --namespace "${NAMESPACE}" \
+            --output=wide
+
+          kubectl get service weaviate \
+            --namespace "${NAMESPACE}"
 
       - name: Create OpenAI Kubernetes Secret
-
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-            test -n "$OPENAI_API_KEY" || {
-              echo "OPENAI_API_KEY is not configured"
-              exit 1
-            }
+          set -euo pipefail
 
-            kubectl create secret generic rag-app-secrets \
+          test -n "${OPENAI_API_KEY:-}" || {
+            echo "OPENAI_API_KEY is not configured in GitHub Secrets."
+            exit 1
+          }
+
+          kubectl create secret generic "${KUBERNETES_SECRET_NAME}" \
+            --namespace "${NAMESPACE}" \
+            --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
+            --dry-run=client \
+            --output=yaml | kubectl apply -f -
+
+      - name: Verify secret before RAG deployment
+        run: |
+          set -euo pipefail
+
+          kubectl get secret "${KUBERNETES_SECRET_NAME}" \
+            --namespace "${NAMESPACE}"
+
+          SECRET_VALUE="$(
+            kubectl get secret "${KUBERNETES_SECRET_NAME}" \
               --namespace "${NAMESPACE}" \
-              --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
-              --dry-run=client \
-              -o yaml | kubectl apply -f -
+              --output=jsonpath='{.data.OPENAI_API_KEY}'
+          )"
 
-      - name: Verify secret
-        run: |
-          kubectl get secret rag-app-secrets \
-            --namespace "${NAMESPACE}"      
+          test -n "${SECRET_VALUE}" || {
+            echo "${KUBERNETES_SECRET_NAME} exists, but OPENAI_API_KEY is missing."
+            exit 1
+          }
 
-      - name: Validate Helm chart
+          echo "Kubernetes Secret exists and contains OPENAI_API_KEY."
+
+      - name: Validate rendered RAG manifests
         run: |
+          set -euo pipefail
+
           helm lint "${HELM_CHART}" \
             --values "${VALUES_FILE}" \
             --set-string image.repository="${{ needs.build.outputs.image }}" \
-            --set-string image.tag="${{ needs.build.outputs.tag }}"
+            --set-string image.tag="${{ needs.build.outputs.tag }}" \
+            --set-string config.gcpProjectId="${PROJECT_ID}" \
+            --set-string config.pubsubProjectId="${PROJECT_ID}" \
+            --set-string serviceAccount.annotations."iam\.gke\.io/gcp-service-account"="rag-app@${PROJECT_ID}.iam.gserviceaccount.com"
 
           helm template "${RELEASE_NAME}" "${HELM_CHART}" \
             --namespace "${NAMESPACE}" \
             --values "${VALUES_FILE}" \
             --set-string image.repository="${{ needs.build.outputs.image }}" \
             --set-string image.tag="${{ needs.build.outputs.tag }}" \
+            --set-string config.gcpProjectId="${PROJECT_ID}" \
+            --set-string config.pubsubProjectId="${PROJECT_ID}" \
+            --set-string serviceAccount.annotations."iam\.gke\.io/gcp-service-account"="rag-app@${PROJECT_ID}.iam.gserviceaccount.com" \
             > rendered-manifests.yaml
 
-      - name: Deploy with Helm
+          if grep -q '^kind: Secret$' rendered-manifests.yaml; then
+            echo "ERROR: The RAG Helm chart is rendering a Secret."
+            echo "Remove or disable templates/secret.yaml because GitHub Actions manages the secret."
+            grep -n -A15 -B5 '^kind: Secret$' rendered-manifests.yaml
+            exit 1
+          fi
+
+          grep -n -A4 -B4 "${KUBERNETES_SECRET_NAME}" \
+            rendered-manifests.yaml
+
+      - name: Install or upgrade RAG application
         run: |
+          set -euo pipefail
+
           helm upgrade --install "${RELEASE_NAME}" "${HELM_CHART}" \
             --namespace "${NAMESPACE}" \
-            --create-namespace \
             --values "${VALUES_FILE}" \
             --set-string image.repository="${{ needs.build.outputs.image }}" \
             --set-string image.tag="${{ needs.build.outputs.tag }}" \
-            --atomic \
+            --set-string config.gcpProjectId="${PROJECT_ID}" \
+            --set-string config.pubsubProjectId="${PROJECT_ID}" \
+            --set-string serviceAccount.annotations."iam\.gke\.io/gcp-service-account"="rag-app@${PROJECT_ID}.iam.gserviceaccount.com" \
             --wait \
-            --timeout 10m
+            --timeout 15m \
+            --history-max 10
+
+      - name: Verify secret after RAG deployment
+        run: |
+          set -euo pipefail
+
+          kubectl get secret "${KUBERNETES_SECRET_NAME}" \
+            --namespace "${NAMESPACE}" \
+            --show-labels
+
+          API_SECRET_REF="$(
+            kubectl get deployment "${RELEASE_NAME}" \
+              --namespace "${NAMESPACE}" \
+              --output=jsonpath='{.spec.template.spec.containers[0].envFrom[*].secretRef.name}'
+          )"
+
+          WORKER_SECRET_REF="$(
+            kubectl get deployment "${RELEASE_NAME}-worker" \
+              --namespace "${NAMESPACE}" \
+              --output=jsonpath='{.spec.template.spec.containers[0].envFrom[*].secretRef.name}'
+          )"
+
+          echo "API secret reference: ${API_SECRET_REF}"
+          echo "Worker secret reference: ${WORKER_SECRET_REF}"
+
+          test "${API_SECRET_REF}" = "${KUBERNETES_SECRET_NAME}"
+          test "${WORKER_SECRET_REF}" = "${KUBERNETES_SECRET_NAME}"
 
       - name: Verify API rollout
         run: |
+          set -euo pipefail
+
           kubectl rollout status \
             deployment/rag-app \
             --namespace "${NAMESPACE}" \
@@ -194,6 +360,8 @@ jobs:
 
       - name: Verify worker rollout
         run: |
+          set -euo pipefail
+
           kubectl rollout status \
             deployment/rag-app-worker \
             --namespace "${NAMESPACE}" \
@@ -204,10 +372,16 @@ jobs:
         run: |
           kubectl get pods \
             --namespace "${NAMESPACE}" \
-            --output=wide
+            --output=wide || true
 
-          kubectl get services \
-            --namespace "${NAMESPACE}"
+          kubectl get deployments,statefulsets,services,pvc \
+            --namespace "${NAMESPACE}" || true
+
+          kubectl get secret "${KUBERNETES_SECRET_NAME}" \
+            --namespace "${NAMESPACE}" || true
+
+          helm status "${WEAVIATE_RELEASE_NAME}" \
+            --namespace "${NAMESPACE}" || true
 
           helm status "${RELEASE_NAME}" \
             --namespace "${NAMESPACE}" || true
@@ -215,21 +389,42 @@ jobs:
       - name: Collect diagnostics after failure
         if: failure()
         run: |
+          echo "=== Kubernetes resources ==="
+          kubectl get all,pvc \
+            --namespace "${NAMESPACE}" \
+            --output=wide || true
+
+          echo "=== Secret status ==="
+          kubectl get secret "${KUBERNETES_SECRET_NAME}" \
+            --namespace "${NAMESPACE}" \
+            --show-labels || true
+
+          echo "=== Pod descriptions ==="
           kubectl describe pods \
             --namespace "${NAMESPACE}" || true
 
+          echo "=== Namespace events ==="
           kubectl get events \
             --namespace "${NAMESPACE}" \
-            --sort-by=.metadata.creationTimestamp || true
+            --sort-by=.lastTimestamp || true
 
+          echo "=== RAG API logs ==="
           kubectl logs \
             deployment/rag-app \
             --namespace "${NAMESPACE}" \
             --all-containers \
             --tail=200 || true
 
+          echo "=== RAG worker logs ==="
           kubectl logs \
             deployment/rag-app-worker \
+            --namespace "${NAMESPACE}" \
+            --all-containers \
+            --tail=200 || true
+
+          echo "=== Weaviate logs ==="
+          kubectl logs \
+            statefulset/weaviate \
             --namespace "${NAMESPACE}" \
             --all-containers \
             --tail=200 || true
