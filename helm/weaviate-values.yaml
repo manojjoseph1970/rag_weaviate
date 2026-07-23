@@ -24,24 +24,24 @@ storage:
 
 resources:
   requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
     cpu: "1"
     memory: 4Gi
-  limits:
-    cpu: "2"
-    memory: 8Gi
 
 requests:
   cpu: "1"
   memory: 4Gi
 
 limits:
-  cpu: "2"
-  memory: 8Gi
+  cpu: "1"
+  memory: 2Gi
 
 env:
   QUERY_DEFAULTS_LIMIT: "25"
-  PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
-  DEFAULT_VECTORIZER_MODULE: "none"
+  #PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+  #DEFAULT_VECTORIZER_MODULE: "none"
   ENABLE_MODULES: ""
   AUTOSCHEMA_ENABLED: "false"
   CLUSTER_HOSTNAME: "node1"
