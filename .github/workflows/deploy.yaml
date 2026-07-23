@@ -16,16 +16,18 @@ permissions:
   id-token: write
 
 env:
-  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  REGION: ${{ vars.GCP_REGION }}
-  CLUSTER_NAME: ${{ vars.GKE_CLUSTER }}
-  GKE_LOCATION: ${{ vars.GKE_LOCATION}}
-  ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY}}
-  IMAGE_NAME: ${{ vars.IMAGE_NAME }}
-  RELEASE_NAME: ${{vars.IMAGE_NAME}}
-  NAMESPACE: ${{vars.NAMESPACE}}
-  HELM_CHART: ${{vars.HELM_CHART}}
-  VALUES_FILE: ${{vars.VALUES_FILE}}
+  GCP_PROJECT_ID=mcp-rag-dev-502016
+  GCP_REGION=us-central1
+  GKE_CLUSTER=rag-cluster
+  GKE_LOCATION=us-central1
+  ARTIFACT_REPOSITORY=rag-images
+  IMAGE_NAME=rag-app
+  RELEASE_NAME=rag-app
+  NAMESPACE=rag
+  HELM_CHART=./helm/rag-app
+  VALUES_FILE=./helm/rag-app/values-prod.yaml
+
+
 
 jobs:
   test:
