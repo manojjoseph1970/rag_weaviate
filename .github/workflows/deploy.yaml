@@ -200,7 +200,7 @@ jobs:
           kubectl create namespace "${NAMESPACE}" \
             --dry-run=client \
             --output=yaml | kubectl apply -f -
-      - name: Create OpenAI Kubernetes Secret
+        -- name: Create OpenAI Kubernetes Secret
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -253,10 +253,10 @@ jobs:
 
           helm repo update
 
-          
           helm upgrade --install weaviate weaviate/weaviate \
             --namespace "${NAMESPACE}" \
-            --values ./helm/weaviate-values.yaml \
+            --version "17.8.3" \
+            --values "${WEAVIATE_VALUES_FILE}" \
             --wait \
             --timeout 15m \
             --history-max 10
