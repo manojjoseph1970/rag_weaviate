@@ -56,15 +56,6 @@ def health_check() -> dict:
         "weaviate": status,
     }
 
-def health_check() -> dict:
-    try:
-        status = health()
-        if not status["ready"]:
-            raise HTTPException(status_code=503, detail=status)
-        return {"status": "ok", "weaviate": status}
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
 
 @app.post("/admin/initialize")
 def initialize() -> dict[str, str]:
