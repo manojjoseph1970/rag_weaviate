@@ -27,7 +27,12 @@ env:
   HELM_CHART: ./helm/rag-app
   VALUES_FILE: ./helm/rag-app/values-prod.yaml
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
+env:
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: rag-app-secrets
+        key: OPENAI_API_KEY   
 
 jobs:
   test:
