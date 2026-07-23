@@ -143,7 +143,7 @@ jobs:
       - name: Create OpenAI Kubernetes Secret
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          run: |
+        run: |
             test -n "$OPENAI_API_KEY" || {
               echo "OPENAI_API_KEY is not configured"
               exit 1
