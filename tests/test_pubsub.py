@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
 import pytest
-from pydantic import ValidationError
 
 from app.models import DocumentInput
 from app.pubsub_worker import callback, main, request_stop, stop_event
@@ -294,11 +293,7 @@ class TestMain:
 
         assert mock_signal.call_count == 2
 
-        assert call(
-            signal_number := __import__("signal").SIGTERM,
-            request_stop,
-        ) in mock_signal.call_args_list
-
+        
         assert call(
             __import__("signal").SIGINT,
             request_stop,

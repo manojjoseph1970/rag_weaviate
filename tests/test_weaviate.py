@@ -1,8 +1,7 @@
 
-from contextlib import contextmanager
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import pytest
