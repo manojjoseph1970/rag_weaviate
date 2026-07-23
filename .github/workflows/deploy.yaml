@@ -158,7 +158,7 @@ jobs:
             --values "${VALUES_FILE}" \
             --set-string image.repository="${{ needs.build.outputs.image }}" \
             --set-string image.tag="${{ needs.build.outputs.tag }}" \
-            --rollback-on-failure \
+            --atomic \
             --wait \
             --timeout 10m
 
