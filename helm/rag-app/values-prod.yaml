@@ -1,6 +1,6 @@
 replicaCount: 1
 
-
+existingSecret: rag-app-secrets
 
 resources:
   requests:
@@ -11,6 +11,7 @@ resources:
     memory: 1Gi
 
 worker:
+  enabled: true
   replicaCount: 1
   resources:
     requests:
@@ -19,14 +20,14 @@ worker:
     limits:
       cpu: "1"
       memory: 2Gi
+
 config:
-  gcpProjectId: mcp-rag-prod
-  pubsubProjectId: mcp-rag-prod
-  pubsubSubscription: document-ingestion-sub-prod
-  collectionName: DocumentChunk
-  weaviateUrl: http://weaviate.rag-prod.svc.cluster.local:80      
-env:
-  CLUSTER_HOSTNAME: "weaviate-node-1"
-  RAFT_JOIN: "weaviate-node-1"
-  RAFT_BOOTSTRAP_EXPECT: "1"
-  CLUSTER_JOIN: "weaviate-headless.rag.svc.cluster.local."      
+  gcpProjectId: mcp-rag-dev-502016
+  pubsubProjectId: mcp-rag-dev-502016
+  pubsubSubscription: document-ingestion-sub
+  weaviateHttpHost: weaviate
+  weaviateHttpPort: 80
+  weaviateGrpcHost: weaviate-grpc
+  weaviateGrpcPort: 50051
+  weaviateSecure: "false"
+  weaviateCollection: DocumentChunk

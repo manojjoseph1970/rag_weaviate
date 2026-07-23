@@ -1,9 +1,10 @@
 name: Build and deploy self-hosted Weaviate RAG
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+
   workflow_dispatch:
 
 permissions:

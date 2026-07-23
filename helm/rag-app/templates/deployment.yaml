@@ -1,11 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
-env:
-  - name: OPENAI_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: rag-app-secrets
-        key: OPENAI_API_KEY
+
 metadata:
   name: {{ include "rag-app.fullname" . }}
   labels:
@@ -45,6 +40,12 @@ spec:
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+
+          envFrom:
+            - configMapRef:
+                name: {{ include "rag-app.fullname" . }}
+            - secretRef:
+                name: {{ required "existingSecret is required" .Values.existingSecret }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
