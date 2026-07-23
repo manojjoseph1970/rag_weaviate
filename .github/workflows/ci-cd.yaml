@@ -90,17 +90,20 @@ jobs:
       - name: Create OpenAI Kubernetes Secret
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-              test -n "$OPENAI_API_KEY" || {
-                echo "OPENAI_API_KEY is not configured"
-                exit 1
-              }  
-        run: |
-          kubectl create secret generic rag-app-secrets \
-            --namespace rag \
-            --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
-            --dry-run=client \
-            -o yaml | kubectl apply -f -
+        - name: Create OpenAI Kubernetes Secret
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    run: |
+      test -n "$OPENAI_API_KEY" || {
+        echo "OPENAI_API_KEY is not configured"
+        exit 1
+      }
+
+      kubectl create secret generic rag-app-secrets \
+        --namespace "${NAMESPACE}" \
+        --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+        --dry-run=client \
+        -o yaml | kubectl apply -f -
 
       - uses: azure/setup-helm@v4
 
