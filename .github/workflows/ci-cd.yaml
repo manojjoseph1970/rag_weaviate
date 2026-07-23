@@ -14,8 +14,8 @@ env:
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   REGION: ${{ vars.GCP_REGION }}
   CLUSTER_NAME: ${{ vars.GKE_CLUSTER }}
-  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
-  NAMESPACE: ${{ vars.GKE_NAMESPACE }}
+  GAR_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+  NAMESPACE: ${{ vars.NAMESPACE }}
   IMAGE_NAME: ${{ vars.IMAGE_NAME }}
 
 
