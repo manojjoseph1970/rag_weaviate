@@ -200,7 +200,7 @@ jobs:
           kubectl create namespace "${NAMESPACE}" \
             --dry-run=client \
             --output=yaml | kubectl apply -f -
-        -- name: Create OpenAI Kubernetes Secret
+      - name: Create OpenAI Kubernetes Secret
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
